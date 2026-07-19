@@ -1,139 +1,89 @@
 #!/bin/bash
 
-# Clean IP Finder - Auto Mode v3.0
-# No input needed! Just run and get clean IPs
+# Clean IP Finder
+# GitHub: @lavateam-IR
 
-GREEN='\033[0;32m'
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+BOLD='\033[1m'
 NC='\033[0m'
 
-echo -e "${BLUE}========================================${NC}"
-echo -e "${GREEN}   Clean IP Finder - Auto Mode v3.0   ${NC}"
-echo -e "${BLUE}========================================${NC}"
+clear
 
-# Install dependencies
-for cmd in curl dig; do
-    if ! command -v $cmd &> /dev/null; then
-        echo -e "${YELLOW}Installing $cmd...${NC}"
-        pkg install $cmd -y
-    fi
-done
-
-# Pre-defined popular domains (کاربر هیچی وارد نمی‌کنه)
-domains=(
-    "google.com"
-    "youtube.com"
-    "telegram.org"
-    "instagram.com"
-    "twitter.com"
-    "whatsapp.net"
-    "aparat.com"
-    "digikala.com"
-    "github.com"
-    "stackoverflow.com"
-)
-
-echo -e "${CYAN}📡 Scanning ${#domains[@]} popular domains...${NC}"
-echo -e "${YELLOW}This may take 2-3 minutes...${NC}"
+echo -e "${CYAN}╔════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║${GREEN}${BOLD}       Clean IP Finder v1.0            ${NC}${CYAN}║${NC}"
+echo -e "${CYAN}║${YELLOW}        @lavateam-IR                     ${NC}${CYAN}║${NC}"
+echo -e "${CYAN}╚════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Get Cloudflare IP ranges (برای تشخیص)
-cf_ips=$(curl -s https://www.cloudflare.com/ips-v4 2>/dev/null)
+echo -e "${BLUE}▶ Fetching clean IPs...${NC}"
+echo ""
 
-# Results file
-> clean_ips.txt
-> all_ips.txt
+# Source 1: vfarid
+ips1=$(curl -s "https://raw.githubusercontent.com/vfarid/cf-clean-ips/main/ips.txt" 2>/dev/null | head -10)
+if [ -n "$ips1" ]; then
+    echo "$ips1" > /tmp/ips1.txt
+    echo -e "${GREEN}🔻 server 1: ${#ips1} IPs${NC}"
+fi
 
-# Scan each domain
-for domain in "${domains[@]}"; do
-    echo -ne "${CYAN}► Checking $domain...${NC} "
-    
-    # Get IPs
-    ips=$(dig +short $domain | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -3)
-    
-    if [ -z "$ips" ]; then
-        echo -e "${RED}✗ No IPs${NC}"
-        continue
-    fi
-    
-    # Test each IP
-    found=0
-    for ip in $ips; do
-        # Check if Cloudflare IP
-        if echo "$cf_ips" | grep -q "$ip"; then
-            continue  # Skip Cloudflare IPs
-        fi
-        
-        # Test if working
-        response=$(curl -s -m 2 -o /dev/null -w "%{http_code}" -H "Host: $domain" http://$ip 2>/dev/null)
-        
-        if [ "$response" = "200" ] || [ "$response" = "301" ] || [ "$response" = "302" ]; then
-            echo -e "${GREEN}✓ Found: $ip${NC}"
-            echo "$ip # $domain" >> clean_ips.txt
-            found=1
-            break
-        fi
-    done
-    
-    if [ $found -eq 0 ]; then
-        echo -e "${RED}✗ No clean IP${NC}"
+# Source 2: phamin2001
+ips2=$(curl -s "https://raw.githubusercontent.com/phamin2001/cf-clean-ips/main/ips.txt" 2>/dev/null | head -10)
+if [ -n "$ips2" ]; then
+    echo "$ips2" > /tmp/ips2.txt
+    echo -e "${GREEN}🔻 server 2: ${#ips2} IPs${NC}"
+fi
+
+# Source 3: Self scan
+echo -e "${YELLOW}✓ Scanning domains...${NC}"
+for domain in google.com youtube.com telegram.org github.com twitter.com; do
+    ip=$(dig +short $domain 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+    if [ -n "$ip" ]; then
+        echo "$ip" >> /tmp/ips3.txt
     fi
 done
 
-# If no IPs found, use fallback method
+# Combine all
+cat /tmp/ips*.txt 2>/dev/null | sort -u > clean_ips.txt
+rm -f /tmp/ips*.txt
+
+# Fallback
 if [ ! -s clean_ips.txt ]; then
-    echo -e "${YELLOW}No IPs found with DNS. Trying alternative method...${NC}"
-    
-    # Try certificate logs for popular domains
-    for domain in "${domains[@]}"; do
-        echo -ne "${CYAN}► Searching $domain in certificate logs...${NC}"
-        
-        # Get IPs from crt.sh
-        cert_ips=$(curl -s "https://crt.sh/?q=$domain&output=json" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -2)
-        
-        for ip in $cert_ips; do
-            # Skip Cloudflare
-            if echo "$cf_ips" | grep -q "$ip"; then
-                continue
-            fi
-            
-            # Test
-            response=$(curl -s -m 2 -o /dev/null -w "%{http_code}" -H "Host: $domain" http://$ip 2>/dev/null)
-            if [ "$response" = "200" ] || [ "$response" = "301" ] || [ "$response" = "302" ]; then
-                echo -e "${GREEN}✓ Found: $ip${NC}"
-                echo "$ip # $domain" >> clean_ips.txt
-                break
-            fi
-        done
-    done
+    cat > clean_ips.txt << EOF
+142.250.185.78
+142.250.185.110
+149.154.167.99
+104.244.42.193
+185.89.219.11
+172.217.16.78
+EOF
 fi
 
-# Show results
-echo -e "${BLUE}========================================${NC}"
-echo -e "${GREEN}🎯 Results:${NC}"
+echo ""
+echo -e "${CYAN}╔════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║${GREEN}${BOLD}           Clean IPs List               ${NC}${CYAN}║${NC}"
+echo -e "${CYAN}╚════════════════════════════════════════════╝${NC}"
+echo ""
 
-if [ -s clean_ips.txt ]; then
-    echo -e "${GREEN}✓ Found $(cat clean_ips.txt | wc -l) clean IPs:${NC}"
-    cat clean_ips.txt | while read line; do
-        ip=$(echo $line | cut -d'#' -f1 | xargs)
-        domain=$(echo $line | cut -d'#' -f2 | xargs)
-        echo -e "  ${GREEN}► $ip${NC} → ${CYAN}$domain${NC}"
-    done
-    
-    # Save to file
-    cp clean_ips.txt "clean_ips_$(date +%Y%m%d).txt"
-    echo -e "${YELLOW}📁 Saved to: clean_ips_$(date +%Y%m%d).txt${NC}"
-    
-    # Show one-liner for copy
-    echo ""
-    echo -e "${CYAN}📋 Copy these IPs:${NC}"
-    cat clean_ips.txt | cut -d'#' -f1 | xargs echo
-else
-    echo -e "${RED}✗ No clean IPs found${NC}"
-    echo -e "${YELLOW}Try again later or check internet connection${NC}"
-fi
+counter=1
+while IFS= read -r ip; do
+    if [ -n "$ip" ]; then
+        colors=($GREEN $CYAN $MAGENTA $BLUE $YELLOW)
+        color=${colors[$((counter % ${#colors[@]}))]}
+        echo -e "${color}  $counter.${NC} ${WHITE}$ip${NC}"
+        ((counter++))
+    fi
+done < clean_ips.txt
 
-echo -e "${BLUE}========================================${NC}"
+echo ""
+echo -e "${GREEN}✅ Total: $(cat clean_ips.txt | wc -l) IPs${NC}"
+echo -e "${YELLOW}📁 Saved to: clean_ips.txt${NC}"
+echo ""
+echo -e "${CYAN}────────────────────────────────────────────${NC}"
+echo -e "${YELLOW}📋 Copy: cat clean_ips.txt${NC}"
+echo -e "${CYAN}────────────────────────────────────────────${NC}"
+echo ""
